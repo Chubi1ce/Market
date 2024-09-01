@@ -1,5 +1,10 @@
-﻿using Market.Models;
+﻿using Market.Abstrctions;
+using Market.Models;
+using Market.Models.DTO;
+using Market.Repo;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Text;
 
 namespace Market.Controllers
 {
@@ -7,110 +12,65 @@ namespace Market.Controllers
     [Route("[controller]")]
     public class ProductController : ControllerBase
     {
-        [HttpPost("postProducts")]
-        public IActionResult PutProducts([FromQuery] string name, string description, int categoryId, double cost)
+        private readonly IProductRepository _productRepository;
+        public ProductController(IProductRepository productRepository)
         {
-            try
-            {
-                using (var context = new ProductContext())
-                {
-                    if (!context.Products.Any(x => x.Name.ToLower().Equals(name)))
-                    {
-                        Product product = new Product()
-                        {
-                            Name = name,
-                            Description = description,
-                            CategoryId = categoryId,
-                            Cost = cost
-                        };
-                        context.Add(product);
-                        context.SaveChanges();
-
-                        return Ok(product.Id);
-                    }
-                    else
-                    {
-                        return StatusCode(409);
-                    }
-                }
-            }
-            catch
-            {
-                return StatusCode(500);
-            }
+            _productRepository = productRepository;
         }
 
-        [HttpDelete("deleteProduct")]
+        [HttpGet("get_products")]
+        public IActionResult GetProduct()
+        {
+            var productsList = _productRepository.GetProducts();
+            return Ok(productsList);
+        }
+
+        [HttpPost("add_product")]
+        public IActionResult AddProduct([FromBody] ProductDTO productDTO)
+        {
+            var result = _productRepository.AddProduct(productDTO);
+            return Ok(result);
+        }
+
+        [HttpDelete("delete_product")]
         public IActionResult DeleteProduct(int id)
         {
-            try
-            {
-                using (var context = new ProductContext())
-                {
-                    if (context.Products.Any(x => x.Id.Equals(id)))
-                    {
-                        var product = new Product()
-                        {
-                            Id = id
-                        };
-                        context.Products.Remove(product);
-                        context.SaveChanges();
-                    }
-                    return Ok();
-                }
-            }
-            catch
-            {
-                return StatusCode(500);
-            }
+            _productRepository.DeleteProduct(id);
+            return Ok();
         }
 
-        [HttpGet("getProducts")]
-        public ActionResult<IEnumerable<Product>> GetProducts()
+        [HttpPatch("edit_price")]
+        public IActionResult EditCost(int id, double newPrice)
         {
-            try
-            {
-                using (var context = new ProductContext())
-                {
-                    var products = context.Products.Select(x => new Product()
-                    {
-                        Id = x.Id,
-                        Name = x.Name,
-                        Description = x.Description
-                    }).ToList();
-                    return products;
-                }
-            }
-            catch
-            {
-                return StatusCode(500);
-            }
+            _productRepository.EditPrice(id, newPrice);
+            return Ok();
         }
 
-        [HttpPatch("editCost")]
-        public IActionResult EditCost(int id, double cost)
+        [HttpGet("get_cash_stats")]
+        public IActionResult GetCacheStats()
         {
-            try
-            {
-                using (var context = new ProductContext())
-                {
-                    if (context.Products.Any(x => x.Id.Equals(id)))
-                    {
-                        var product = new Product()
-                        {
-                            Id = id,
-                            Cost = cost
-                        };
-                        context.Products.Update(product);
-                        context.SaveChanges();
-                    }
-                    return Ok();
-                }
-            }
-            catch
-            {
-                return StatusCode(404);
-            }
+            return Ok(_productRepository.GetCacheStats());
+        }
+
+        [HttpGet("upload_to_csv")]
+        public FileContentResult ToFile()
+        {
+            var content = _productRepository.UpLoadToCsv();
+            return File(new UTF8Encoding().GetBytes(content), "text/csv", "products.csv");
+        }
+
+        [HttpGet("get_products_csv_url")]
+        public ActionResult<string> GetProductsCsvUrl()
+        {
+            var fileName = _productRepository.GetProductsCsvUrl();
+            return "https://" + Request.Host.ToString() + "/static/" + fileName;
+        }
+
+        [HttpGet("upload_cache_to_csv")]
+        public ActionResult<string> UploadCacheToCsvUrl()
+        {
+            var fileName = _productRepository.UploadCacheToCsvUrl();
+            return "https://" + Request.Host.ToString() + "/static/" + fileName;
         }
     }
 }
